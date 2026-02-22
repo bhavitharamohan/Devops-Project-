@@ -2,47 +2,26 @@ version: 0.2
 
 env:
   variables:
-    AWS_REGION: ap-south-1
-    ACCOUNT_ID: 592934231649
-    ECR_REPO: brain-tasks-app
-    CLUSTER_NAME: brain-cluster
-    DEPLOYMENT_NAME: brain-app
-    CONTAINER_NAME: brain-app
+    AWS_DEFAULT_REGION: ap-south-1
+    IMAGE_REPO_NAME: brain-tasks-app
+    IMAGE_TAG: latest
 
 phases:
-  install:
-    runtime-versions:
-      docker: 20
-    commands:
-      - echo Installing kubectl...
-      - curl -o kubectl https://s3.$AWS_REGION.amazonaws.com/amazon-eks/1.27.0/2023-11-14/bin/linux/amd64/kubectl
-      - chmod +x kubectl
-      - mv kubectl /usr/local/bin/
-
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
-      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-      - REPOSITORY_URI=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO
-      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - echo Repository URI: $REPOSITORY_URI
-      - echo Image Tag: $IMAGE_TAG
-
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin 592934231649.dkr.ecr.ap-south-1.amazonaws.com
   build:
     commands:
       - echo Building Docker image...
-      - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
-      - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:latest
-
+      - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
+      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG 592934231649.dkr.ecr.ap-south-1.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
   post_build:
     commands:
-      - echo Pushing Docker images to ECR...
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - docker push $REPOSITORY_URI:latest
+      - echo Pushing Docker image...
+      - docker push 592934231649.dkr.ecr.ap-south-1.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - printf '[{"name":"brain-tasks-container","imageUri":"%s"}]' 592934231649.dkr.ecr.ap-south-1.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG > imagedefinitions.json
 
-      - echo Updating kubeconfig...
-      - aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME
-
-      - echo Updating Kubernetes deployment...
-      - kubectl set image deployment/$DEPLOYMENT_NAME $CONTAINER_NAME=$REPOSITORY_URI:$IMAGE_TAG
-      - kubectl rollout status deployment/$DEPLOYMENT_NAME
+artifacts:
+  files:
+    - imagedefinitions.json
